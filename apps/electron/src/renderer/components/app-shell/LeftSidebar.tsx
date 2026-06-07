@@ -968,6 +968,17 @@ export function LeftSidebar({ width }: LeftSidebarProps): React.ReactElement {
     })
   }, [openSession, setActiveView, setUnviewedCompleted])
 
+  /** 重命名工作区（项目）名称 */
+  const handleWorkspaceRename = React.useCallback(async (workspaceId: string, newName: string): Promise<void> => {
+    try {
+      const updated = await window.electronAPI.updateAgentWorkspace(workspaceId, { name: newName })
+      setWorkspaces((prev) => prev.map((w) => (w.id === updated.id ? updated : w)))
+    } catch (error) {
+      console.error('[侧边栏] 重命名工作区失败:', error)
+      toast.error('重命名失败')
+    }
+  }, [setWorkspaces])
+
   /** 重命名 Agent 会话标题 */
   const handleAgentRename = React.useCallback(async (id: string, newTitle: string): Promise<void> => {
     try {
@@ -1594,6 +1605,7 @@ export function LeftSidebar({ width }: LeftSidebarProps): React.ReactElement {
                     setSettingsTab('agent')
                     setSettingsOpen(true)
                   }}
+                  onRenameWorkspace={handleWorkspaceRename}
                   onSelectSession={handleSelectAgentSession}
                   onRequestDelete={handleRequestDelete}
                   onRequestMove={handleRequestMove}
@@ -2361,6 +2373,7 @@ interface AgentProjectGroupItemProps {
   onDrop: (e: React.DragEvent, workspaceId: string) => void
   onDragEnd: () => void
   onConfigureProject: (workspaceId: string) => void
+  onRenameWorkspace: (workspaceId: string, newName: string) => Promise<void>
   onSelectSession: (id: string, title: string) => void
   onRequestDelete: (id: string) => void
   onRequestMove: (id: string) => void
@@ -2389,6 +2402,7 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
   onDrop,
   onDragEnd,
   onConfigureProject,
+  onRenameWorkspace,
   onSelectSession,
   onRequestDelete,
   onRequestMove,
@@ -2397,6 +2411,37 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
   onToggleArchive,
 }: AgentProjectGroupItemProps): React.ReactElement {
   const isCurrent = group.workspace.id === currentWorkspaceId
+
+  const [renamingWorkspace, setRenamingWorkspace] = React.useState(false)
+  const [workspaceEditName, setWorkspaceEditName] = React.useState('')
+  const workspaceEditRef = React.useRef<HTMLInputElement>(null)
+
+  const handleStartWorkspaceRename = (): void => {
+    setWorkspaceEditName(group.workspace.name)
+    setRenamingWorkspace(true)
+    requestAnimationFrame(() => {
+      workspaceEditRef.current?.focus()
+      workspaceEditRef.current?.select()
+    })
+  }
+
+  const handleWorkspaceRenameCommit = async (): Promise<void> => {
+    const trimmed = workspaceEditName.trim()
+    setRenamingWorkspace(false)
+    if (trimmed && trimmed !== group.workspace.name) {
+      await onRenameWorkspace(group.workspace.id, trimmed)
+    }
+  }
+
+  const handleWorkspaceRenameKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter') {
+      if (e.nativeEvent.isComposing) return
+      e.preventDefault()
+      void handleWorkspaceRenameCommit()
+    } else if (e.key === 'Escape') {
+      setRenamingWorkspace(false)
+    }
+  }
   const recentCutoff = relativeTimeNow - PROJECT_SESSION_RECENT_WINDOW_MS
   // 折叠时：所有"活跃"会话（运行中 / 阻塞 / 未查看的已完成）必须展示，
   // 不受 PROJECT_SESSION_PREVIEW_LIMIT 与 3 天窗口限制；活跃部分内部按
@@ -2460,9 +2505,22 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
           )}
         >
           <FolderOpen size={13} className="flex-shrink-0 text-foreground/40" />
-          <span className="flex-1 min-w-0 truncate text-[13px] font-medium leading-[18px]">
-            {group.workspace.name}
-          </span>
+          {renamingWorkspace ? (
+            <input
+              ref={workspaceEditRef}
+              value={workspaceEditName}
+              onChange={(e) => setWorkspaceEditName(e.target.value)}
+              onKeyDown={handleWorkspaceRenameKeyDown}
+              onBlur={() => void handleWorkspaceRenameCommit()}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 min-w-0 bg-transparent text-[13px] font-medium text-foreground border-b border-primary/50 outline-none px-0.5 leading-[18px]"
+              maxLength={50}
+            />
+          ) : (
+            <span className="flex-1 min-w-0 truncate text-[13px] font-medium leading-[18px]">
+              {group.workspace.name}
+            </span>
+          )}
         </button>
 
         <Tooltip>
@@ -2499,6 +2557,13 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
             >
               <FolderOpen size={14} />
               设为当前项目
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-xs py-1 [&>svg]:size-3.5"
+              onSelect={handleStartWorkspaceRename}
+            >
+              <Pencil size={14} />
+              重命名
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-xs py-1 [&>svg]:size-3.5"
