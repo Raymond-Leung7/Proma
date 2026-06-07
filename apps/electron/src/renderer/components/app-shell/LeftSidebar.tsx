@@ -2415,14 +2415,20 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
   const [renamingWorkspace, setRenamingWorkspace] = React.useState(false)
   const [workspaceEditName, setWorkspaceEditName] = React.useState('')
   const workspaceEditRef = React.useRef<HTMLInputElement>(null)
+  // Radix closes the dropdown and asynchronously restores focus to the trigger
+  // button. We guard against that spurious blur for the duration of the close
+  // animation (~150 ms) so the input isn't dismissed before the user types.
+  const skipWorkspaceBlurRef = React.useRef(false)
 
   const handleStartWorkspaceRename = (): void => {
     setWorkspaceEditName(group.workspace.name)
     setRenamingWorkspace(true)
-    requestAnimationFrame(() => {
+    skipWorkspaceBlurRef.current = true
+    setTimeout(() => {
       workspaceEditRef.current?.focus()
       workspaceEditRef.current?.select()
-    })
+      skipWorkspaceBlurRef.current = false
+    }, 150)
   }
 
   const handleWorkspaceRenameCommit = async (): Promise<void> => {
@@ -2433,12 +2439,18 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
     }
   }
 
+  const handleWorkspaceRenameBlur = (): void => {
+    if (skipWorkspaceBlurRef.current) return
+    void handleWorkspaceRenameCommit()
+  }
+
   const handleWorkspaceRenameKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter') {
       if (e.nativeEvent.isComposing) return
       e.preventDefault()
       void handleWorkspaceRenameCommit()
     } else if (e.key === 'Escape') {
+      skipWorkspaceBlurRef.current = false
       setRenamingWorkspace(false)
     }
   }
@@ -2511,7 +2523,7 @@ const AgentProjectGroupItem = React.memo(function AgentProjectGroupItem({
               value={workspaceEditName}
               onChange={(e) => setWorkspaceEditName(e.target.value)}
               onKeyDown={handleWorkspaceRenameKeyDown}
-              onBlur={() => void handleWorkspaceRenameCommit()}
+              onBlur={handleWorkspaceRenameBlur}
               onClick={(e) => e.stopPropagation()}
               className="flex-1 min-w-0 bg-transparent text-[13px] font-medium text-foreground border-b border-primary/50 outline-none px-0.5 leading-[18px]"
               maxLength={50}
