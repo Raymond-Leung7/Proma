@@ -59,8 +59,9 @@ function killStaleVite(port: number): void {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'ignore'],
           })
-          // 仅杀 vite/node 进程，避免误伤偶然占用该端口的其他服务
-          if (/vite|node/.test(cmd)) {
+          // 仅杀命令行包含 vite 的进程（dev server 由 node 运行 vite，命令行必含 vite 脚本路径），
+          // 不匹配裸 node，避免误伤偶然占用该端口的其他 node 服务
+          if (/vite/.test(cmd)) {
             execSync(`kill ${pid} 2>/dev/null`, { stdio: 'ignore' })
           }
         } catch {

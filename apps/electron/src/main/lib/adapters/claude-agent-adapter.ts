@@ -896,7 +896,12 @@ export class ClaudeAgentAdapter implements AgentProviderAdapter {
             ;(msg as Record<string, unknown>)._keepChannelOpenForTasks = true
             armIdleTimer()
           } else if (keepForReason) {
-            // 既有"等待用户决策"路径（权限/ExitPlan/AskUser）：保持开启、不加空闲超时。
+            // 既有"可继续"路径（abort/defer/hook，对应权限/ExitPlan/AskUser 等待）：
+            // 保持通道开启。本轮并非真正空闲——SDK 会继续驱动新一轮，故不打
+            // _keepChannelOpenForTasks 注解（不让 UI 进软空闲态，否则会与"继续中"的真实状态冲突）。
+            // 但若此时同时有后台任务在飞行（keepForTasks），仍 arm idle timer 作为安全网：
+            // 任务活动会持续重置计时器，仅在长时间彻底静默时兜底释放子进程，避免叠加场景下子进程泄漏。
+            if (keepForTasks) armIdleTimer()
           } else {
             // result 表示本轮真正结束，关闭消息通道让 SDK 自然调用 endInput() 关闭 stdin。
             // 子进程检测到 stdin EOF 后会退出，readMessages() 结束，iterator 返回 done:true。
