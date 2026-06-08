@@ -46,7 +46,21 @@ function killStaleVite(port: number): void {
         if (m) pids.add(m[1]!)
       }
       for (const pid of pids) {
-        try { execSync(`taskkill /F /PID ${pid} 2>nul`, { stdio: 'ignore' }) } catch { /* 已退出 */ }
+        try {
+          const cmd = execSync(
+            `powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"ProcessId = ${pid}\\").CommandLine"`,
+            {
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+            }
+          )
+          // Windows 也只杀命令行包含 vite 的进程，避免误伤偶然占用该端口的其他服务
+          if (/vite/i.test(cmd)) {
+            execSync(`taskkill /F /PID ${pid} 2>nul`, { stdio: 'ignore' })
+          }
+        } catch {
+          // 进程已退出、无权限或无法读取命令行，忽略
+        }
       }
     } else {
       const out = execSync(`lsof -ti:${port} 2>/dev/null`, {
