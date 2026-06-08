@@ -1852,10 +1852,21 @@ export function registerIpcHandlers(): void {
       const affectedSessionIds = listAgentSessions()
         .filter((session) => session.workspaceId === id)
         .map((session) => session.id)
+      const affectedAutomationIds = listAutomations()
+        .filter((automation) => automation.workspaceId === id)
+        .map((automation) => automation.id)
 
-      const defaultWorkspace = ensureDefaultWorkspace()
       for (const sessionId of affectedSessionIds) {
-        moveSessionToWorkspace(sessionId, defaultWorkspace.id)
+        if (isAgentSessionActive(sessionId)) {
+          stopAgent(sessionId)
+        }
+        deleteAgentSession(sessionId)
+      }
+      for (const automationId of affectedAutomationIds) {
+        deleteAutomation(automationId)
+      }
+      if (affectedAutomationIds.length > 0) {
+        broadcastAutomationsChanged()
       }
       deleteAgentWorkspace(id)
     }
