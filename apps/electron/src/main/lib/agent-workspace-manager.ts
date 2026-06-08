@@ -260,18 +260,20 @@ export function deleteAgentWorkspace(id: string): void {
     throw new Error(`工作区目录路径异常，已跳过删除: ${workspaceDir}`)
   }
 
+  // 先移除索引条目并落盘，再删目录：
+  // 即使随后 rmSync 失败，也只会残留一个无引用目录（无害，可被同 slug 重建覆盖），
+  // 而不会留下指向已删目录的孤儿索引条目导致 UI 状态不一致
+  const removed = index.workspaces.splice(idx, 1)[0]!
+  writeIndex(index)
+
   if (existsSync(workspaceDir)) {
     try {
       rmSync(workspaceDir, { recursive: true, force: true })
       console.log(`[Agent 工作区] 已删除工作区目录: ${workspaceDir}`)
     } catch (error) {
-      console.warn(`[Agent 工作区] 删除工作区目录失败 (${target.slug}):`, error)
-      throw new Error(`删除工作区目录失败: ${target.name}`)
+      console.warn(`[Agent 工作区] 删除工作区目录失败，已残留无引用目录 (${target.slug}):`, error)
     }
   }
-
-  const removed = index.workspaces.splice(idx, 1)[0]!
-  writeIndex(index)
 
   console.log(`[Agent 工作区] 已删除工作区: ${removed.name} (slug: ${removed.slug})`)
 }
