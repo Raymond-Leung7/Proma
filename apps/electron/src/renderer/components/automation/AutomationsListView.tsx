@@ -15,7 +15,7 @@
 import * as React from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { toast } from 'sonner'
-import { Clock, Pause, Play, Power, Plus, Trash2 } from 'lucide-react'
+import { Clock, Pause, Play, Power, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -24,7 +24,19 @@ import {
   automationToDraft,
   createEmptyDraft,
 } from '@/atoms/automation-atoms'
+import { agentPendingPromptAtom } from '@/atoms/agent-atoms'
+import { useCreateSession } from '@/hooks/useCreateSession'
 import type { Automation } from '@proma/shared'
+
+/** 协作创建定时任务时，自动注入新 Agent 会话的引导消息 */
+const COLLAB_CREATE_PROMPT = `我想创建一个定时任务，请通过对话引导我完成。
+
+请先问清楚这几点，再用 automation 工具帮我创建：
+1. 你希望 Proma 定期帮你做什么（任务内容）
+2. 多久执行一次（如每天某时间、每周某天、每隔几小时/分钟）
+3. 确认细节后，再创建定时任务
+
+如果我的描述不够清楚，主动追问；信息齐全后直接创建并告诉我结果。`
 
 /** 把调度配置格式化为可读文案 */
 function formatSchedule(a: Automation): string {
@@ -43,6 +55,8 @@ export function AutomationsListView(): React.ReactElement {
   const automations = useAtomValue(automationsAtom)
   const setAutomations = useSetAtom(automationsAtom)
   const setForm = useSetAtom(automationFormAtom)
+  const { createAgent } = useCreateSession()
+  const setAgentPendingPrompt = useSetAtom(agentPendingPromptAtom)
 
   const refreshList = React.useCallback(async () => {
     const list = await window.electronAPI.listAutomations()
@@ -68,6 +82,16 @@ export function AutomationsListView(): React.ReactElement {
     setForm({ open: true, draft: automationToDraft(a) })
   }
 
+  // 协作创建：开一个新的 Agent 会话（带 automation 工具），注入引导 prompt 由对话完成创建
+  const handleCollabCreate = async (): Promise<void> => {
+    const sessionId = await createAgent()
+    if (!sessionId) {
+      toast.error('创建会话失败，请重试')
+      return
+    }
+    setAgentPendingPrompt({ sessionId, message: COLLAB_CREATE_PROMPT })
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* 标题栏 */}
@@ -89,7 +113,7 @@ export function AutomationsListView(): React.ReactElement {
       {/* 列表内容 */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {automations.length === 0 ? (
-          <EmptyState onCreate={handleCreate} />
+          <EmptyState onCreate={handleCreate} onCollabCreate={handleCollabCreate} />
         ) : (
           <div className="flex flex-col gap-8 max-w-5xl w-full mx-auto px-8 pb-8">
             {current.length > 0 && (
@@ -247,7 +271,13 @@ function Section({ title, automations, onEdit, onRefresh, variant }: SectionProp
   )
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }): React.ReactElement {
+function EmptyState({
+  onCreate,
+  onCollabCreate,
+}: {
+  onCreate: () => void
+  onCollabCreate: () => void | Promise<void>
+}): React.ReactElement {
   return (
     <div className="max-w-2xl mx-auto pt-24 flex flex-col items-center text-center gap-4">
       <div className="size-16 rounded-2xl bg-foreground/[0.04] flex items-center justify-center">
@@ -260,14 +290,25 @@ function EmptyState({ onCreate }: { onCreate: () => void }): React.ReactElement 
           也可以在对话中用「以后每隔 X 分钟…」让 Proma 自动识别并创建。
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onCreate}
-	        className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-      >
-        <Plus size={14} />
-        <span>新建定时任务</span>
-      </button>
+      <div className="mt-2 flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => { void onCollabCreate() }}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+        >
+          <Sparkles size={14} />
+          <span>跟 Proma 协作创建</span>
+          <span className="text-[11px] opacity-80">推荐</span>
+        </button>
+        <button
+          type="button"
+          onClick={onCreate}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium border border-border/60 text-foreground/75 hover:bg-foreground/[0.06] transition-colors"
+        >
+          <Plus size={14} />
+          <span>手动新建</span>
+        </button>
+      </div>
     </div>
   )
 }
