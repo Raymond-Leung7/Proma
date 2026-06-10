@@ -11,7 +11,8 @@ import { tabsAtom } from '@/atoms/tab-atoms'
 import { ChatView } from '@/components/chat'
 import { AgentView } from '@/components/agent'
 import { PreviewTabContent } from '@/components/diff/PreviewTabContent'
-import { DiffTabContent } from '@/components/diff/DiffTabContent'
+import { MarkdownRichEditor } from '@/components/diff/MarkdownRichEditor'
+import { MarkdownToc } from '@/components/diff/MarkdownToc'
 import { ScratchPadView } from '@/components/scratch-pad/ScratchPadView'
 import { TabErrorBoundary } from './TabErrorBoundary'
 
@@ -70,21 +71,27 @@ export function TabContent({ tabId }: TabContentProps): React.ReactElement {
 }
 
 function TutorialTabContent(): React.ReactElement {
-  const [filePath, setFilePath] = React.useState<string | null>(null)
+  const [content, setContent] = React.useState<string | null>(null)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
-    window.electronAPI.getTutorialFilePath().then(setFilePath).catch(console.error)
+    window.electronAPI.getTutorialContent().then(setContent).catch(console.error)
   }, [])
 
-  if (!filePath) return <div className="flex h-full items-center justify-center text-xs text-muted-foreground">加载中...</div>
+  if (content === null) return <div className="flex h-full items-center justify-center text-xs text-muted-foreground">加载中...</div>
 
   return (
-    <DiffTabContent
-      filePath={filePath}
-      dirPath={filePath.slice(0, filePath.lastIndexOf('/'))}
-      sessionId="tutorial"
-      previewOnly
-      readOnly
-    />
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <div ref={scrollRef} className="flex-1 min-w-0 overflow-y-auto p-8">
+        <MarkdownRichEditor
+          value={content}
+          editing={false}
+          onChange={() => {}}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />
+      </div>
+      <MarkdownToc containerRef={scrollRef as React.RefObject<HTMLElement>} contentKey={content.slice(0, 100)} enabled />
+    </div>
   )
 }
