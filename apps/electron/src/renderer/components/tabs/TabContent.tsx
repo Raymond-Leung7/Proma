@@ -6,8 +6,9 @@
  */
 
 import * as React from 'react'
-import { useAtomValue } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import { tabsAtom } from '@/atoms/tab-atoms'
+import { markdownTocOpenAtom } from '@/atoms/markdown-toc'
 import { ChatView } from '@/components/chat'
 import { AgentView } from '@/components/agent'
 import { PreviewTabContent } from '@/components/diff/PreviewTabContent'
@@ -72,6 +73,7 @@ export function TabContent({ tabId }: TabContentProps): React.ReactElement {
 
 function TutorialTabContent(): React.ReactElement {
   const [content, setContent] = React.useState<string | null>(null)
+  const [tocOpen] = useAtom(markdownTocOpenAtom)
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -81,7 +83,8 @@ function TutorialTabContent(): React.ReactElement {
   if (content === null) return <div className="flex h-full items-center justify-center text-xs text-muted-foreground">加载中...</div>
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden">
+    <div className="relative flex h-full min-h-0 overflow-hidden">
+      <MarkdownToc containerRef={scrollRef as React.RefObject<HTMLElement>} contentKey={content.slice(0, 100)} enabled={tocOpen} />
       <div ref={scrollRef} className="flex-1 min-w-0 overflow-y-auto p-8">
         <MarkdownRichEditor
           value={content}
@@ -91,7 +94,6 @@ function TutorialTabContent(): React.ReactElement {
           onCancel={() => {}}
         />
       </div>
-      <MarkdownToc containerRef={scrollRef as React.RefObject<HTMLElement>} contentKey={content.slice(0, 100)} enabled />
     </div>
   )
 }
