@@ -22,8 +22,8 @@ function getTutorialFilePath(): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, 'tutorial.md')
   }
-  // 开发模式：app.getAppPath() → apps/electron/
-  return join(app.getAppPath(), '../../tutorial/tutorial-v2.md')
+  // 开发模式：__dirname → dist/ → apps/electron/ → apps/ → monorepo root
+  return join(__dirname, '../../../tutorial/tutorial-v2.md')
 }
 
 /**
