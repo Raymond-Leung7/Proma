@@ -97,7 +97,7 @@ export function PreviewPanel({ sessionId }: PreviewPanelProps): React.ReactEleme
                   ? 'text-primary bg-primary/10'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
               )}
-              aria-label={previewModePref === 'split' ? '默认侧边分屏（已启用）' : '默认侧边分屏'}
+              aria-label={previewModePref === 'split' ? '默认展开方式：侧边分屏，点击改为标签页' : '默认展开方式：标签页，点击改为侧边分屏'}
             >
               <PanelRight className="size-3.5" />
             </button>
@@ -105,8 +105,8 @@ export function PreviewPanel({ sessionId }: PreviewPanelProps): React.ReactEleme
           <TooltipContent side="bottom">
             <p>
               {previewModePref === 'split'
-                ? '默认预览方式：侧边分屏（点击切回标签页）'
-                : '默认预览方式：标签页（点击切为侧边分屏）'}
+                ? '默认展开方式：侧边分屏 · 点击改为「标签页」（仅影响下次打开，不改变当前预览）'
+                : '默认展开方式：标签页 · 点击改为「侧边分屏」（仅影响下次打开，不改变当前预览）'}
             </p>
           </TooltipContent>
         </Tooltip>

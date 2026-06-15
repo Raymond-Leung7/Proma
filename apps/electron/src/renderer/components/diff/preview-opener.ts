@@ -22,7 +22,6 @@ import {
 import {
   activeTabIdAtom,
   closeTab,
-  createPreviewTabId,
   getPreviewTabTitle,
   isPreviewTab,
   openTab,
@@ -33,18 +32,11 @@ import {
 /** Jotai store 类型（从 useStore 推导，避免直接 import 内部 Store 类型） */
 type JotaiStore = ReturnType<typeof useStore>
 
-interface OpenPreviewOptions {
-  /** 跳过偏好读取，强制以 Tab 方式打开（用于 PreviewPanel 的 Maximize2 等显式入口） */
-  forceTab?: boolean
-  /** 跳过偏好读取，强制以分屏方式打开（用于拖拽 Tab 出区域转分屏） */
-  forceSplit?: boolean
-}
-
 export function useOpenPreview() {
   const store = useStore()
 
   return React.useCallback(
-    (sessionId: string, file: PreviewFile, opts: OpenPreviewOptions = {}) => {
+    (sessionId: string, file: PreviewFile) => {
       // 1. 文件状态两种模式都需要，先写入
       store.set(previewFileMapAtom, (prev) => {
         const m = new Map(prev)
@@ -52,11 +44,7 @@ export function useOpenPreview() {
         return m
       })
 
-      const preferSplit = opts.forceSplit
-        ? true
-        : opts.forceTab
-          ? false
-          : store.get(previewModePreferenceAtom) === 'split'
+      const preferSplit = store.get(previewModePreferenceAtom) === 'split'
 
       if (preferSplit) {
         // 分屏：开启预览面板，不创建 Tab
@@ -93,7 +81,7 @@ export function useOpenPreview() {
  * 流程：关闭 preview Tab → 激活对应会话的 agent Tab → 开启右侧分屏。
  * previewFileMap 中保留的文件就是分屏要显示的内容，无需重新打开。
  *
- * 若传入的 tabId 不是 preview Tab（或已找不到），不做任何事。
+ * 若传入的 tabId 不是 preview Tab、已找不到，或该会话没有可承载分屏的 agent Tab，则不做任何事。
  */
 export function tearOffPreviewToSplit(store: JotaiStore, tabId: string): void {
   const tabs = store.get(tabsAtom)
@@ -102,12 +90,14 @@ export function tearOffPreviewToSplit(store: JotaiStore, tabId: string): void {
 
   const sessionId = tab.sessionId
 
-  // 关闭 preview Tab，激活相邻 Tab（通常是会话 Tab）
+  // 分屏渲染在该会话的 agent 视图内，若没有对应 agent Tab 则无处承载，保持 Tab 模式不动
+  const agentTab = tabs.find((t) => t.type === 'agent' && t.sessionId === sessionId)
+  if (!agentTab) return
+
+  // 关闭 preview Tab，并激活该会话的 agent Tab，让右侧分屏可见
   const closed = closeTab(store.get(tabsAtom), store.get(activeTabIdAtom), tabId)
   store.set(tabsAtom, closed.tabs)
-  // 优先激活该会话的 agent Tab，让右侧分屏可见
-  const agentTab = closed.tabs.find((t) => t.type === 'agent' && t.sessionId === sessionId)
-  store.set(activeTabIdAtom, agentTab?.id ?? closed.activeTabId)
+  store.set(activeTabIdAtom, agentTab.id)
 
   // 标记会话视图为 session，避免切走再切回时重建 preview Tab
   store.set(sessionViewStateMapAtom, (prev) => {
@@ -122,10 +112,5 @@ export function tearOffPreviewToSplit(store: JotaiStore, tabId: string): void {
     m.set(sessionId, true)
     return m
   })
-}
-
-/** 根据会话 ID 派生对应的 preview Tab ID */
-export function getPreviewTabIdForSession(sessionId: string): string {
-  return createPreviewTabId(sessionId)
 }
 

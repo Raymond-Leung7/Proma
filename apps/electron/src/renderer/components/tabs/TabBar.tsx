@@ -222,15 +222,18 @@ function TabBarInner({
 
     if (e.button !== 0) return
     const startX = e.clientX
-    const startY = e.clientY
     let torn = false
     let sorting = false
+
+    // 拖出 TabBar 上下边界后还需再越过这段缓冲距离才触发 tear-off，
+    // 避免在水平排序过程中轻微的垂直抖动误触发转分屏。
+    const TEAR_OFF_MARGIN = 24
 
     const handleMove = (me: PointerEvent): void => {
       if (torn) return
       const rect = barRef.current?.getBoundingClientRect()
-      // 拖出 TabBar 上下边界即视为 tear-off
-      const outOfBar = !!rect && (me.clientY < rect.top || me.clientY > rect.bottom)
+      // 拖出 TabBar 上/下边界并越过缓冲距离才视为 tear-off
+      const outOfBar = !!rect && (me.clientY < rect.top - TEAR_OFF_MARGIN || me.clientY > rect.bottom + TEAR_OFF_MARGIN)
       if (outOfBar) {
         torn = true
         setTearingOff(tabId)
@@ -258,7 +261,6 @@ function TabBarInner({
 
     document.addEventListener('pointermove', handleMove)
     document.addEventListener('pointerup', handleUp)
-    void startY
   }, [tabs, onDragStart, onTearOff])
 
   // 鼠标滚轮横向滚动（使用原生事件监听器以支持 preventDefault）
