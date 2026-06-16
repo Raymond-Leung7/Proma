@@ -31,6 +31,7 @@ interface McpServerFormProps {
   /** 当前工作区 slug */
   workspaceSlug: string
   onSaved: () => void
+  onChanged?: () => void
   onCancel: () => void
 }
 
@@ -119,7 +120,7 @@ function buildEntryFromValues(values: McpFormValues, includeTestResult = false):
   return base
 }
 
-export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpServerFormProps): React.ReactElement {
+export function McpServerForm({ server, workspaceSlug, onSaved, onChanged, onCancel }: McpServerFormProps): React.ReactElement {
   const isEdit = server !== null
   const isBuiltin = server?.entry.isBuiltin === true
 
@@ -153,6 +154,7 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
   const isFirstRenderRef = React.useRef(true)
   const mountedRef = React.useRef(true)
   const [saveStatus, setSaveStatus] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const lastSavedEnabledRef = React.useRef(server?.entry.enabled ?? false)
 
   // 保留最新表单值，供 unmount 时 flush 待保存变更
   const latestValuesRef = React.useRef({
@@ -214,6 +216,10 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
       }
       await window.electronAPI.saveWorkspaceMcpConfig(workspaceSlug, newConfig)
       if (generation === saveGenerationRef.current && mountedRef.current) {
+        if (entry.enabled !== lastSavedEnabledRef.current) {
+          lastSavedEnabledRef.current = entry.enabled
+          onChanged?.()
+        }
         setSaveStatus('saved')
         setTimeout(() => {
           if (generation === saveGenerationRef.current && mountedRef.current) {
@@ -228,7 +234,7 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
         setSaveStatus('error')
       }
     }
-  }, [workspaceSlug])
+  }, [workspaceSlug, onChanged])
 
   const doSaveEntryRef = React.useRef(doSaveEntry)
   React.useEffect(() => { doSaveEntryRef.current = doSaveEntry }, [doSaveEntry])
@@ -372,11 +378,31 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
     return canSubmit()
   }
 
+  /** 返回/关闭：编辑模式下先 flush 待保存变更 */
+  const handleCancel = async (): Promise<void> => {
+    if (isEdit && autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+      const vals = latestValuesRef.current
+      const serverName = vals.name.trim()
+      if (serverName) {
+        const isValid =
+          (vals.transportType === 'stdio' && vals.command.trim()) ||
+          (vals.transportType !== 'stdio' && vals.url.trim())
+        if (isValid) {
+          const entry = buildEntryFromValues(vals, true)
+          await doSaveEntryRef.current(serverName, entry)
+        }
+      }
+    }
+    onCancel()
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 标题栏 + 操作按钮 */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" type="button" onClick={onCancel}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" type="button" onClick={() => void handleCancel()}>
           <ArrowLeft size={18} />
         </Button>
         <h3 className="text-lg font-medium text-foreground flex-1">
