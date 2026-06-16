@@ -540,7 +540,7 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onChanged, onCan
               <div>
                 <div className="text-sm font-medium text-foreground">连接测试</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  必须测试成功后才能启用
+                  必须测试成功后才能启用；测试失败的 MCP 可能导致整个 Agent 运行失败
                 </div>
               </div>
               <Button
@@ -596,7 +596,7 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onChanged, onCan
             description={
               testResult?.success
                 ? '开启后该 MCP 服务器将在 Agent 会话中加载'
-                : '只有测试成功后才能启用'
+                : '只有测试成功后才能启用，否则可能导致整个 Agent 运行失败'
             }
             checked={enabled}
             onCheckedChange={setEnabled}
