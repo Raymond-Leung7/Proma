@@ -20,16 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { workspaceCapabilitiesVersionAtom } from '@/atoms/agent-atoms'
 import { useProjectActions } from '@/hooks/useProjectActions'
 import type { McpServerEntry, SkillMeta } from '@proma/shared'
@@ -281,63 +272,41 @@ export function AgentSkillsView(): React.ReactElement {
       />
 
       {/* Skill 删除确认 */}
-      <AlertDialog
+      <ConfirmDialog
         open={pendingDeleteSkill !== null}
-        onOpenChange={(open) => { if (!open && !isDeletingSkill) setPendingDeleteSkill(null) }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除 Skill「{pendingDeleteSkill?.name}」？</AlertDialogTitle>
-            <AlertDialogDescription>删除后将无法恢复，确定要卸载这个 Skill 吗？</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSkill}>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!pendingDeleteSkill || isDeletingSkill) return
-                setIsDeletingSkill(true)
-                const ok = await data.deleteSkill(pendingDeleteSkill.slug, pendingDeleteSkill.name)
-                setIsDeletingSkill(false)
-                setPendingDeleteSkill(null)
-                if (ok) setSelectedSkillSlug(null)
-              }}
-              disabled={isDeletingSkill}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {isDeletingSkill ? '删除中...' : '删除'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onOpenChange={(open) => { if (!open) setPendingDeleteSkill(null) }}
+        title={`确认删除 Skill「${pendingDeleteSkill?.name}」？`}
+        description="删除后将无法恢复，确定要卸载这个 Skill 吗？"
+        confirmLabel="删除"
+        loadingLabel="删除中..."
+        loading={isDeletingSkill}
+        onConfirm={async () => {
+          if (!pendingDeleteSkill || isDeletingSkill) return
+          setIsDeletingSkill(true)
+          const ok = await data.deleteSkill(pendingDeleteSkill.slug, pendingDeleteSkill.name)
+          setIsDeletingSkill(false)
+          setPendingDeleteSkill(null)
+          if (ok) setSelectedSkillSlug(null)
+        }}
+      />
 
       {/* MCP 删除确认 */}
-      <AlertDialog
+      <ConfirmDialog
         open={pendingDeleteMcpName !== null}
-        onOpenChange={(open) => { if (!open && !isDeletingMcp) setPendingDeleteMcpName(null) }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除 MCP 服务器「{pendingDeleteMcpName}」？</AlertDialogTitle>
-            <AlertDialogDescription>删除后将无法恢复，确定要删除这个 MCP 服务器吗？</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingMcp}>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!pendingDeleteMcpName || isDeletingMcp) return
-                setIsDeletingMcp(true)
-                await data.deleteMcp(pendingDeleteMcpName)
-                setIsDeletingMcp(false)
-                setPendingDeleteMcpName(null)
-              }}
-              disabled={isDeletingMcp}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {isDeletingMcp ? '删除中...' : '删除'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onOpenChange={(open) => { if (!open) setPendingDeleteMcpName(null) }}
+        title={`确认删除 MCP 服务器「${pendingDeleteMcpName}」？`}
+        description="删除后将无法恢复，确定要删除这个 MCP 服务器吗？"
+        confirmLabel="删除"
+        loadingLabel="删除中..."
+        loading={isDeletingMcp}
+        onConfirm={async () => {
+          if (!pendingDeleteMcpName || isDeletingMcp) return
+          setIsDeletingMcp(true)
+          await data.deleteMcp(pendingDeleteMcpName)
+          setIsDeletingMcp(false)
+          setPendingDeleteMcpName(null)
+        }}
+      />
 
       <McpDetailSheet
         open={mcpSheetOpen}

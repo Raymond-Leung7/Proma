@@ -150,7 +150,8 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
   // 自动保存状态（仅编辑模式）
   const AUTO_SAVE_DELAY = 600
   const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const initializedRef = React.useRef(false)
+  const isFirstRenderRef = React.useRef(true)
+  const mountedRef = React.useRef(true)
   const [saveStatus, setSaveStatus] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   // 保留最新表单值，供 unmount 时 flush 待保存变更
@@ -213,17 +214,17 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
         servers: { ...config.servers, [serverName]: entry },
       }
       await window.electronAPI.saveWorkspaceMcpConfig(workspaceSlug, newConfig)
-      if (generation === saveGenerationRef.current) {
+      if (generation === saveGenerationRef.current && mountedRef.current) {
         setSaveStatus('saved')
         setTimeout(() => {
-          if (generation === saveGenerationRef.current) {
+          if (generation === saveGenerationRef.current && mountedRef.current) {
             setSaveStatus('idle')
           }
         }, 2000)
       }
     } catch (error) {
       console.error('[MCP 表单] 自动保存失败:', error)
-      if (generation === saveGenerationRef.current) {
+      if (generation === saveGenerationRef.current && mountedRef.current) {
         toast.error('自动保存失败')
         setSaveStatus('error')
       }
@@ -233,20 +234,18 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
   const doSaveEntryRef = React.useRef(doSaveEntry)
   React.useEffect(() => { doSaveEntryRef.current = doSaveEntry }, [doSaveEntry])
 
-  // 编辑模式初始化完成后标记，避免加载时触发 auto-save
-  React.useEffect(() => {
-    if (!isEdit) {
-      initializedRef.current = true
-      return
-    }
-    const t = setTimeout(() => { initializedRef.current = true }, 100)
-    return () => clearTimeout(t)
-  }, [isEdit])
-
   // 编辑模式下监听字段变化，防抖自动保存
   React.useEffect(() => {
-    if (!isEdit || !initializedRef.current) return
-    if (!canSubmit()) return
+    if (!isEdit) return
+    // 首次渲染跳过，避免加载时触发 auto-save
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      return
+    }
+    const serverName = name.trim()
+    if (!serverName) return
+    if (transportType === 'stdio' && !command.trim()) return
+    if (transportType !== 'stdio' && !url.trim()) return
     setSaveStatus('idle')
     autoSaveTimerRef.current = setTimeout(() => {
       const vals = latestValuesRef.current
@@ -273,9 +272,10 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
     testResult,
   ])
 
-  // 组件卸载时 flush 待保存的变更
+  // 组件卸载时 flush 待保存的变更，并标记 unmounted
   React.useEffect(() => {
     return () => {
+      mountedRef.current = false
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current)
         autoSaveTimerRef.current = null
