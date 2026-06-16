@@ -20,6 +20,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { workspaceCapabilitiesVersionAtom } from '@/atoms/agent-atoms'
 import { useProjectActions } from '@/hooks/useProjectActions'
 import type { McpServerEntry, SkillMeta } from '@proma/shared'
@@ -44,6 +54,10 @@ export function AgentSkillsView(): React.ReactElement {
   const [editingMcp, setEditingMcp] = React.useState<{ name: string; entry: McpServerEntry } | null>(null)
   const [showImport, setShowImport] = React.useState(false)
   const [wsPopoverOpen, setWsPopoverOpen] = React.useState(false)
+  const [pendingDeleteSkill, setPendingDeleteSkill] = React.useState<SkillMeta | null>(null)
+  const [pendingDeleteMcpName, setPendingDeleteMcpName] = React.useState<string | null>(null)
+  const [isDeletingSkill, setIsDeletingSkill] = React.useState(false)
+  const [isDeletingMcp, setIsDeletingMcp] = React.useState(false)
 
   const q = search.trim().toLowerCase()
 
@@ -245,7 +259,7 @@ export function AgentSkillsView(): React.ReactElement {
               total={mcpCount}
               onOpen={(name, entry) => { setEditingMcp({ name, entry }); setMcpSheetOpen(true) }}
               onToggle={data.toggleMcp}
-              onDelete={data.deleteMcp}
+              onRequestDelete={setPendingDeleteMcpName}
               onAdd={() => { setEditingMcp(null); setMcpSheetOpen(true) }}
             />
           )}
@@ -261,21 +275,76 @@ export function AgentSkillsView(): React.ReactElement {
         onOpenChange={(open) => { if (!open) setSelectedSkillSlug(null) }}
         onToggle={(enabled) => selectedSkill && data.toggleSkill(selectedSkill.slug, enabled)}
         onUpdate={() => selectedSkill && data.updateSkill(selectedSkill.slug)}
-        onDelete={async () => {
-          if (!selectedSkill) return
-          const ok = await data.deleteSkill(selectedSkill.slug, selectedSkill.name)
-          if (ok) setSelectedSkillSlug(null)
-        }}
+        onRequestDelete={() => selectedSkill && setPendingDeleteSkill(selectedSkill)}
         onOpenFolder={() => selectedSkill && openSkillFolder(selectedSkill.slug)}
         onChanged={() => bumpCapabilities((v) => v + 1)}
       />
+
+      {/* Skill 删除确认 */}
+      <AlertDialog
+        open={pendingDeleteSkill !== null}
+        onOpenChange={(open) => { if (!open && !isDeletingSkill) setPendingDeleteSkill(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除 Skill「{pendingDeleteSkill?.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>删除后将无法恢复，确定要卸载这个 Skill 吗？</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSkill}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!pendingDeleteSkill || isDeletingSkill) return
+                setIsDeletingSkill(true)
+                const ok = await data.deleteSkill(pendingDeleteSkill.slug, pendingDeleteSkill.name)
+                setIsDeletingSkill(false)
+                setPendingDeleteSkill(null)
+                if (ok) setSelectedSkillSlug(null)
+              }}
+              disabled={isDeletingSkill}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isDeletingSkill ? '删除中...' : '删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MCP 删除确认 */}
+      <AlertDialog
+        open={pendingDeleteMcpName !== null}
+        onOpenChange={(open) => { if (!open && !isDeletingMcp) setPendingDeleteMcpName(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除 MCP 服务器「{pendingDeleteMcpName}」？</AlertDialogTitle>
+            <AlertDialogDescription>删除后将无法恢复，确定要删除这个 MCP 服务器吗？</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingMcp}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!pendingDeleteMcpName || isDeletingMcp) return
+                setIsDeletingMcp(true)
+                await data.deleteMcp(pendingDeleteMcpName)
+                setIsDeletingMcp(false)
+                setPendingDeleteMcpName(null)
+              }}
+              disabled={isDeletingMcp}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isDeletingMcp ? '删除中...' : '删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <McpDetailSheet
         open={mcpSheetOpen}
         server={editingMcp}
         workspaceSlug={data.workspaceSlug}
-        onOpenChange={setMcpSheetOpen}
-        onSaved={() => { setMcpSheetOpen(false); bumpCapabilities((v) => v + 1) }}
+        onOpenChange={(open) => { setMcpSheetOpen(open); if (!open) bumpCapabilities((v) => v + 1) }}
+        onSaved={() => setMcpSheetOpen(false)}
       />
 
       <ImportSkillDialog
@@ -369,11 +438,11 @@ interface McpTabProps {
   total: number
   onOpen: (name: string, entry: McpServerEntry) => void
   onToggle: (name: string, enabled: boolean) => void
-  onDelete: (name: string) => void
+  onRequestDelete: (name: string) => void
   onAdd: () => void
 }
 
-function McpTab({ entries, total, onOpen, onToggle, onDelete, onAdd }: McpTabProps): React.ReactElement {
+function McpTab({ entries, total, onOpen, onToggle, onRequestDelete, onAdd }: McpTabProps): React.ReactElement {
   if (total === 0) {
     return (
       <EmptyState
@@ -406,7 +475,7 @@ function McpTab({ entries, total, onOpen, onToggle, onDelete, onAdd }: McpTabPro
           entry={entry}
           onOpen={() => onOpen(name, entry)}
           onToggle={(enabled) => onToggle(name, enabled)}
-          onDelete={() => onDelete(name)}
+          onRequestDelete={() => onRequestDelete(name)}
         />
       ))}
     </div>
