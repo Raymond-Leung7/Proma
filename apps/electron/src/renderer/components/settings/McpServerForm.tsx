@@ -171,10 +171,11 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onChanged, onCan
     if (!server) return // 新建时不需要清空
 
     // 检查关键配置是否改变（包括连接相关的所有字段）
+    // 注意：server.entry.command/url 可能为 undefined，需要与空字符串统一比较
     const configChanged =
       transportType !== server.entry.type ||
-      (transportType === 'stdio' && command !== server.entry.command) ||
-      (transportType !== 'stdio' && url !== server.entry.url) ||
+      (transportType === 'stdio' && command !== (server.entry.command ?? '')) ||
+      (transportType !== 'stdio' && url !== (server.entry.url ?? '')) ||
       argsText !== (server.entry.args?.join(', ') ?? '') ||
       envText !== serializeKeyValueText(server.entry.env, '=') ||
       headersText !== serializeKeyValueText(server.entry.headers, ':')
