@@ -207,7 +207,6 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
   /** 执行自动保存 */
   const doSaveEntry = React.useCallback(async (serverName: string, entry: McpServerEntry) => {
     const generation = ++saveGenerationRef.current
-    setSaveStatus('saving')
     try {
       const config = await window.electronAPI.getWorkspaceMcpConfig(workspaceSlug)
       const newConfig: WorkspaceMcpConfig = {
@@ -220,7 +219,7 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
           if (generation === saveGenerationRef.current && mountedRef.current) {
             setSaveStatus('idle')
           }
-        }, 2000)
+        }, 3000)
       }
     } catch (error) {
       console.error('[MCP 表单] 自动保存失败:', error)
@@ -383,16 +382,14 @@ export function McpServerForm({ server, workspaceSlug, onSaved, onCancel }: McpS
         <h3 className="text-lg font-medium text-foreground flex-1">
           {isEdit ? '编辑 MCP 服务器' : '添加 MCP 服务器'}
         </h3>
-        {isEdit && saveStatus !== 'idle' && (
+        {isEdit && (saveStatus === 'saved' || saveStatus === 'error') && (
           <div className={cn(
             'flex items-center gap-1.5 text-xs',
             saveStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
           )}>
-            {saveStatus === 'saving' && <Loader2 size={12} className="animate-spin" />}
             {saveStatus === 'saved' && <CheckCircle2 size={12} className="text-emerald-600" />}
             {saveStatus === 'error' && <XCircle size={12} />}
             <span>
-              {saveStatus === 'saving' && '保存中...'}
               {saveStatus === 'saved' && '已保存'}
               {saveStatus === 'error' && '保存失败'}
             </span>
