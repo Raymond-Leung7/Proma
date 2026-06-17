@@ -133,7 +133,7 @@ export function PromptSettings(): React.ReactElement {
   /** 名称变更 */
   const handleNameChange = (value: string): void => {
     setEditName(value)
-    if (selectedPrompt && !selectedPrompt.isBuiltin) {
+    if (selectedPrompt) {
       debounceSave(selectedPrompt.id, { name: value })
     }
   }
@@ -141,7 +141,7 @@ export function PromptSettings(): React.ReactElement {
   /** 内容变更 */
   const handleContentChange = (value: string): void => {
     setEditContent(value)
-    if (selectedPrompt && !selectedPrompt.isBuiltin) {
+    if (selectedPrompt) {
       debounceSave(selectedPrompt.id, { content: value })
     }
   }
@@ -199,8 +199,6 @@ export function PromptSettings(): React.ReactElement {
               <Input
                 value={editName}
                 onChange={(e) => handleNameChange(e.target.value)}
-                readOnly={selectedPrompt.isBuiltin}
-                className={cn(selectedPrompt.isBuiltin && 'opacity-60 cursor-not-allowed')}
                 maxLength={50}
               />
             </div>
@@ -211,11 +209,7 @@ export function PromptSettings(): React.ReactElement {
               <Textarea
                 value={editContent}
                 onChange={(e) => handleContentChange(e.target.value)}
-                readOnly={selectedPrompt.isBuiltin}
-                className={cn(
-                  'min-h-[280px] resize-y',
-                  selectedPrompt.isBuiltin && 'opacity-60 cursor-not-allowed'
-                )}
+                className="min-h-[280px] resize-y"
                 placeholder="输入系统提示词内容..."
               />
             </div>

@@ -40,13 +40,10 @@ function readConfig(): SystemPromptConfig {
     const raw = readFileSync(filePath, 'utf-8')
     const data = JSON.parse(raw) as SystemPromptConfig
 
-    // 确保内置提示词始终存在，且内容与源码保持同步
+    // 确保内置提示词始终存在
     const builtinIndex = data.prompts.findIndex((p) => p.id === BUILTIN_DEFAULT_ID)
     if (builtinIndex === -1) {
       data.prompts.unshift({ ...BUILTIN_DEFAULT_PROMPT })
-    } else {
-      // 始终用源码中的最新内容覆盖，防止文件中残留旧版本
-      data.prompts[builtinIndex] = { ...BUILTIN_DEFAULT_PROMPT }
     }
 
     return {
@@ -103,8 +100,6 @@ export function createSystemPrompt(input: SystemPromptCreateInput): SystemPrompt
 
 /**
  * 更新提示词
- *
- * 内置提示词不可编辑。
  */
 export function updateSystemPrompt(id: string, input: SystemPromptUpdateInput): SystemPrompt {
   const config = readConfig()
@@ -115,10 +110,6 @@ export function updateSystemPrompt(id: string, input: SystemPromptUpdateInput): 
   }
 
   const prompt = config.prompts[index]!
-  if (prompt.isBuiltin) {
-    throw new Error('内置提示词不可编辑')
-  }
-
   if (input.name !== undefined) prompt.name = input.name
   if (input.content !== undefined) prompt.content = input.content
   prompt.updatedAt = Date.now()
@@ -130,8 +121,6 @@ export function updateSystemPrompt(id: string, input: SystemPromptUpdateInput): 
 
 /**
  * 删除提示词
- *
- * 内置提示词不可删除。
  * 如果被删除的是当前默认提示词，重置为内置默认。
  */
 export function deleteSystemPrompt(id: string): void {
@@ -140,10 +129,6 @@ export function deleteSystemPrompt(id: string): void {
 
   if (!prompt) {
     throw new Error(`提示词不存在: ${id}`)
-  }
-
-  if (prompt.isBuiltin) {
-    throw new Error('内置提示词不可删除')
   }
 
   config.prompts = config.prompts.filter((p) => p.id !== id)
